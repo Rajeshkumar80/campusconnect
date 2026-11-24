@@ -1,0 +1,42 @@
+[project]
+name = "campusconnect-backend"
+version = "0.1.0"
+description = "CampusConnect Flask Backend with DSA Core"
+readme = "../README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1",
+    "pymongo>=4.8",
+    "flask-limiter>=3.5",
+    "flask-wtf>=1.2",
+    "argon2-cffi>=23.1",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.5",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+select = ["E", "F", "I", "UP", "BLE", "SIM", "PIE", "RUF"]
+ignore = ["BLE001"]  # Allow broad exception handling for API error responses
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
