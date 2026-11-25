@@ -11,7 +11,6 @@ import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Modal } from '../components/ui/Modal';
-import { Composer } from '../components/feed/Composer';
 import { PostCard } from '../components/feed/PostCard';
 import type { Connection, ConnectionRequest, FeedPost, Suggestion } from '../types';
 
@@ -21,7 +20,6 @@ export function FeedPage() {
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [composerOpen, setComposerOpen] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -68,9 +66,11 @@ export function FeedPage() {
         title="Campus feed"
         description="Notes, projects and moments from the people you are connected to."
         actions={
-          <Button variant="primary" leftIcon={<ImagePlus className="h-4 w-4" />} onClick={() => setComposerOpen(true)}>
-            New post
-          </Button>
+          <Link to="/create-post">
+            <Button variant="primary" leftIcon={<ImagePlus className="h-4 w-4" />}>
+              New post
+            </Button>
+          </Link>
         }
       />
 
@@ -91,7 +91,7 @@ export function FeedPage() {
                 </div>
               ))
             ) : posts.length === 0 ? (
-              <EmptyFeed onCompose={() => setComposerOpen(true)} hasConnections={connections.length > 0} />
+              <EmptyFeed hasConnections={connections.length > 0} />
             ) : (
               posts.map((post) => (
                 <PostCard
@@ -162,18 +162,6 @@ export function FeedPage() {
         </aside>
       </div>
 
-      <Composer
-        isOpen={composerOpen}
-        onClose={() => setComposerOpen(false)}
-        authorName={user?.profile?.name}
-        onCreated={(post) =>
-          setPosts((current) => [
-            { ...post, author_name: user?.profile?.name, author_username: user?.username },
-            ...current,
-          ])
-        }
-      />
-
       <Modal
         isOpen={Boolean(deletingPostId)}
         onClose={() => setDeletingPostId(null)}
@@ -194,7 +182,7 @@ export function FeedPage() {
   );
 }
 
-function EmptyFeed({ onCompose, hasConnections }: { onCompose: () => void; hasConnections: boolean }) {
+function EmptyFeed({ hasConnections }: { hasConnections: boolean }) {
   return (
     <div className="card px-6 py-14 text-center">
       <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand-light text-brand">
@@ -209,9 +197,11 @@ function EmptyFeed({ onCompose, hasConnections }: { onCompose: () => void; hasCo
           : 'Connect with classmates to see their posts here. Your own posts stay on your profile.'}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Button variant="primary" onClick={onCompose}>
-          Write the first post
-        </Button>
+        <Link to="/create-post">
+          <Button variant="primary">
+            Write the first post
+          </Button>
+        </Link>
         {!hasConnections && (
           <Link to="/discover" className="btn btn-secondary btn-md">
             Find classmates

@@ -11,6 +11,9 @@ const RegisterPage = lazy(() =>
   import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage }))
 );
 const FeedPage = lazy(() => import('./pages/FeedPage').then((m) => ({ default: m.FeedPage })));
+const CreatePostPage = lazy(() =>
+  import('./pages/CreatePostPage').then((m) => ({ default: m.CreatePostPage }))
+);
 const ProfilePage = lazy(() =>
   import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
 );
@@ -73,6 +76,7 @@ function AppRoutes() {
           }
         >
           <Route path="/" element={<FeedPage />} />
+          <Route path="/create-post" element={<CreatePostPage />} />
           <Route path="/profile/:userId?" element={<ProfilePage />} />
           <Route path="/connections" element={<ConnectionsPage />} />
           <Route path="/messages/:userId?" element={<MessagesPage />} />
