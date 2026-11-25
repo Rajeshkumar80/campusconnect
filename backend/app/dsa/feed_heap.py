@@ -26,7 +26,7 @@ class Post:
     author_id: str
     text: str
     created_at: float  # Unix timestamp
-    # Additional fields can be added as needed
+    media: dict | None = None
 
 
 @dataclass(order=True)
@@ -130,6 +130,7 @@ def merge_post_streams_with_metadata(
             "post_id": post.post_id,
             "author_id": post.author_id,
             "text": post.text,
+            "media": post.media,
             "created_at": post.created_at,
         }
         for post in posts
@@ -170,6 +171,7 @@ def create_post_streams_from_raw(
                 author_id=author_id,
                 text=p["text"],
                 created_at=p["created_at"],
+                media=p.get("media"),
             )
             for p in limited
         ]

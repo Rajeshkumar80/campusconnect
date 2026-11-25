@@ -7,11 +7,15 @@ graph, trie, request queue, and other algorithmic data structures.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from flask import Flask
 
 from app.dsa import (
+    ConnectionRequest,
     Graph,
     RequestQueue,
+    RequestStatus,
     Trie,
 )
 from app.repositories.interfaces import (
@@ -19,6 +23,13 @@ from app.repositories.interfaces import (
     PostRepository,
     UserRepository,
 )
+
+
+def _to_datetime(value) -> datetime:
+    """Parse a stored timestamp into a datetime."""
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(value)
 
 
 class DSAEngine:
@@ -52,17 +63,28 @@ class DSAEngine:
             self.graph.add_user(user["user_id"])
             # Index username and display name for prefix search
             self.trie.insert(user["username"], user["user_id"])
-            if user.get("name"):
-                self.trie.insert(user["name"], user["user_id"])
-        
+            display_name = (user.get("profile") or {}).get("name")
+            if display_name:
+                self.trie.insert(display_name, user["user_id"])
+
         # Load accepted connections and build graph
         connections = connection_repo.get_all_accepted_connections()
         for conn in connections:
             self.graph.add_edge(conn["user_low"], conn["user_high"])
-        
+
         # Load pending requests
         pending_requests = connection_repo.get_all_pending_requests()
-        self.request_queue.rebuild_from_requests(pending_requests)
+        self.request_queue.rebuild_from_requests([
+            ConnectionRequest(
+                request_id=r["request_id"],
+                sender_id=r["sender_id"],
+                recipient_id=r["recipient_id"],
+                status=RequestStatus(r["status"]),
+                created_at=_to_datetime(r["created_at"]),
+                updated_at=_to_datetime(r["updated_at"]),
+            )
+            for r in pending_requests
+        ])
         
         self._initialized = True
     
@@ -82,8 +104,9 @@ class DSAEngine:
         users = user_repo.get_all_users()
         for user in users:
             self.trie.insert(user["username"], user["user_id"])
-            if user.get("name"):
-                self.trie.insert(user["name"], user["user_id"])
+            display_name = (user.get("profile") or {}).get("name")
+            if display_name:
+                self.trie.insert(display_name, user["user_id"])
     
     def rebuild_request_queue(self, connection_repo: ConnectionRepository) -> None:
         """Rebuild request queue from pending requests."""

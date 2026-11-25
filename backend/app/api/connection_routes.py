@@ -1,4 +1,4 @@
-"""
+﻿"""
 Connection Routes - Connection Requests, Accepted Connections, Discovery.
 """
 
@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
+from app.api.errors import error_response, internal_error
 from app.security.decorators import (
     get_current_user_id,
     login_required,
@@ -26,8 +27,8 @@ def list_connections() -> tuple[dict, int]:
         connections = conn_service.get_connections(user_id)
         
         return jsonify({"data": {"connections": connections}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.post("/requests")
@@ -40,10 +41,10 @@ def send_connection_request() -> tuple[dict, int]:
     recipient_id = data.get("recipient_id", "").strip()
     
     if not recipient_id:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "Recipient ID is required"}}), 400
+        return error_response("VALIDATION_ERROR", "Recipient ID is required", 400)
     
     if recipient_id == user_id:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "Cannot connect to yourself"}}), 400
+        return error_response("VALIDATION_ERROR", "Cannot connect to yourself", 400)
     
     try:
         conn_service = ConnectionService()
@@ -51,9 +52,9 @@ def send_connection_request() -> tuple[dict, int]:
         
         return jsonify({"data": {"request": request_obj}}), 201
     except ValueError as e:
-        return jsonify({"error": {"code": "CONFLICT", "message": str(e)}}), 409
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+        return error_response("CONFLICT", str(e), 409)
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.get("/requests/incoming")
@@ -67,8 +68,8 @@ def get_incoming_requests() -> tuple[dict, int]:
         requests = conn_service.get_incoming_requests(user_id)
         
         return jsonify({"data": {"requests": requests}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.get("/requests/outgoing")
@@ -82,8 +83,8 @@ def get_outgoing_requests() -> tuple[dict, int]:
         requests = conn_service.get_outgoing_requests(user_id)
         
         return jsonify({"data": {"requests": requests}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.post("/requests/<request_id>/accept")
@@ -98,9 +99,9 @@ def accept_request(request_id: str) -> tuple[dict, int]:
         
         return jsonify({"data": {"request": request_obj}}), 200
     except ValueError as e:
-        return jsonify({"error": {"code": "FORBIDDEN", "message": str(e)}}), 403
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+        return error_response("FORBIDDEN", str(e), 403)
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.post("/requests/<request_id>/reject")
@@ -115,9 +116,9 @@ def reject_request(request_id: str) -> tuple[dict, int]:
         
         return jsonify({"data": {"request": request_obj}}), 200
     except ValueError as e:
-        return jsonify({"error": {"code": "FORBIDDEN", "message": str(e)}}), 403
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+        return error_response("FORBIDDEN", str(e), 403)
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.post("/requests/<request_id>/cancel")
@@ -132,9 +133,9 @@ def cancel_request(request_id: str) -> tuple[dict, int]:
         
         return jsonify({"data": {"request": request_obj}}), 200
     except ValueError as e:
-        return jsonify({"error": {"code": "FORBIDDEN", "message": str(e)}}), 403
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+        return error_response("FORBIDDEN", str(e), 403)
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.delete("/<user_id>")
@@ -143,20 +144,20 @@ def remove_connection(user_id: str) -> tuple[dict, int]:
     """Remove an accepted connection."""
     current_user_id = get_current_user_id()
     
-    # Authorization: must be one of the connection participants
-    if current_user_id not in (user_id, user_id):
-        return jsonify({"error": {"code": "FORBIDDEN", "message": "Not authorized to remove this connection"}}), 403
+    # The session user may only drop their own edge with the target user.
+    if current_user_id == user_id:
+        return error_response("VALIDATION_ERROR", "Cannot remove a connection with yourself", 400)
     
     try:
         conn_service = ConnectionService()
         success = conn_service.remove_connection(current_user_id, user_id)
         
         if not success:
-            return jsonify({"error": {"code": "NOT_FOUND", "message": "Connection not found"}}), 404
+            return error_response("NOT_FOUND", "Connection not found", 404)
         
         return jsonify({"data": {"message": "Connection removed"}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.get("/<user_id>/mutual")
@@ -170,8 +171,8 @@ def get_mutual_connections(user_id: str) -> tuple[dict, int]:
         mutual = conn_service.get_mutual_connections(current_user_id, user_id)
         
         return jsonify({"data": {"mutual_connections": mutual}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.get("/<user_id>/degree")
@@ -185,8 +186,8 @@ def get_connection_degree(user_id: str) -> tuple[dict, int]:
         degree = conn_service.get_connection_degree(current_user_id, user_id)
         
         return jsonify({"data": {"degree": degree}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.get("/<user_id>/path")
@@ -200,8 +201,8 @@ def get_shortest_path(user_id: str) -> tuple[dict, int]:
         path = conn_service.get_shortest_path(current_user_id, user_id)
         
         return jsonify({"data": {"path": path}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @connection_bp.get("/suggestions")
@@ -216,5 +217,5 @@ def get_suggestions() -> tuple[dict, int]:
         suggestions = conn_service.get_suggestions(user_id, limit)
         
         return jsonify({"data": {"suggestions": suggestions}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()

@@ -59,18 +59,40 @@ class ConnectionService:
         # Create request in repository
         request_doc = self._conn_repo.create_request(sender_id, recipient_id)
         
-        # Update DSA engine request queue
-        self._engine.request_queue.create_request(sender_id, recipient_id)
+        # Update DSA engine request queue using the persisted request ID
+        self._engine.request_queue.create_request(
+            sender_id, recipient_id, request_id=request_doc["request_id"]
+        )
         
         return request_doc
     
+    def _user_summary(self, user_id: str) -> dict[str, Any] | None:
+        """Build a public user summary, or None if the user is not active."""
+        user = self._user_repo.get_user_by_id(user_id)
+        if not user or user.get("status") != "active":
+            return None
+        profile = user.get("profile", {})
+        return {
+            "user_id": user["user_id"],
+            "username": user["username"],
+            "name": profile.get("name", ""),
+            "programme": profile.get("programme", ""),
+            "year": profile.get("year", 0),
+        }
+
     def get_incoming_requests(self, user_id: str) -> list[dict[str, Any]]:
-        """Get incoming pending requests."""
-        return self._conn_repo.get_pending_incoming(user_id)
+        """Get incoming pending requests, enriched with sender details."""
+        requests = self._conn_repo.get_pending_incoming(user_id)
+        for request in requests:
+            request["sender"] = self._user_summary(request["sender_id"])
+        return requests
     
     def get_outgoing_requests(self, user_id: str) -> list[dict[str, Any]]:
-        """Get outgoing pending requests."""
-        return self._conn_repo.get_pending_outgoing(user_id)
+        """Get outgoing pending requests, enriched with recipient details."""
+        requests = self._conn_repo.get_pending_outgoing(user_id)
+        for request in requests:
+            request["recipient"] = self._user_summary(request["recipient_id"])
+        return requests
     
     def accept_request(self, request_id: str, actor_id: str) -> dict[str, Any]:
         """Accept a connection request."""
@@ -191,13 +213,16 @@ class ConnectionService:
     
     def get_suggestions(self, user_id: str, limit: int = 10) -> list[dict[str, Any]]:
         """Get people you may know suggestions."""
+        from app.dsa import get_suggestions_with_explanation
+
         # Get pending request IDs to exclude
         incoming = self._conn_repo.get_pending_incoming(user_id)
         outgoing = self._conn_repo.get_pending_outgoing(user_id)
         pending_ids = {r["sender_id"] for r in incoming} | {r["recipient_id"] for r in outgoing}
-        
+
         # Get suggestions from DSA engine
-        suggestions = self._engine.get_suggestions_with_explanation(
+        suggestions = get_suggestions_with_explanation(
+            self._engine.graph,
             user_id,
             limit=limit,
             exclude_pending=pending_ids,
@@ -219,5 +244,28 @@ class ConnectionService:
                     "mutual_count": s["mutual_count"],
                     "explanation": s["explanation"],
                 })
-        
+
+        # Mutual-first list, then everyone else on campus so the page is never
+        # empty for a student who has not built a network yet.
+        if len(enriched) < limit:
+            seen = {item["user_id"] for item in enriched}
+            excluded = seen | set(self._conn_repo.get_connections(user_id)) | pending_ids
+            excluded.add(user_id)
+            for user in self._user_repo.get_all_users():
+                if user["user_id"] in excluded:
+                    continue
+                profile = user.get("profile", {})
+                enriched.append({
+                    "user_id": user["user_id"],
+                    "username": user["username"],
+                    "name": profile.get("name", ""),
+                    "programme": profile.get("programme", ""),
+                    "year": profile.get("year", 0),
+                    "score": 0,
+                    "mutual_count": 0,
+                    "explanation": "New to your campus network",
+                })
+                if len(enriched) >= limit:
+                    break
+
         return enriched

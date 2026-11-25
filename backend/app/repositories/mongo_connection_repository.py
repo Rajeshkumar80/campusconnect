@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from app.repositories.formatting import iso_or_raw
 from app.repositories.interfaces import ConnectionRepository
 
 
@@ -149,8 +150,8 @@ class MongoConnectionRepository(ConnectionRepository):
             "sender_id": request["sender_id"],
             "recipient_id": request["recipient_id"],
             "status": request["status"],
-            "created_at": request["created_at"].isoformat() if isinstance(request["created_at"], datetime) else request["created_at"],
-            "updated_at": request["updated_at"].isoformat() if isinstance(request["updated_at"], datetime) else request["updated_at"],
+            "created_at": iso_or_raw(request["created_at"]),
+            "updated_at": iso_or_raw(request["updated_at"]),
         }
     
     def _format_connection(self, connection: dict) -> dict[str, Any]:
@@ -158,5 +159,5 @@ class MongoConnectionRepository(ConnectionRepository):
         return {
             "user_low": connection["user_low"],
             "user_high": connection["user_high"],
-            "created_at": connection["created_at"].isoformat() if isinstance(connection["created_at"], datetime) else connection["created_at"],
+            "created_at": iso_or_raw(connection["created_at"]),
         }

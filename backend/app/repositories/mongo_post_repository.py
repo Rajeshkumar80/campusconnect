@@ -22,6 +22,7 @@ class MongoPostRepository(PostRepository):
         self,
         author_id: str,
         text: str,
+        media: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a new post."""
         now = datetime.now(UTC)
@@ -30,6 +31,7 @@ class MongoPostRepository(PostRepository):
             "_id": post_id,
             "author_id": author_id,
             "text": text,
+            "media": media,
             "created_at": now,
             "updated_at": now,
         }
@@ -75,11 +77,23 @@ class MongoPostRepository(PostRepository):
         return result
     
     def _format_post(self, post: dict) -> dict[str, Any]:
-        """Format post document for API response."""
+        """Format post document for API response.
+
+        created_at/updated_at are Unix timestamps (floats) because the feed
+        heap merge compares them numerically.
+        """
         return {
             "post_id": post["_id"],
             "author_id": post["author_id"],
             "text": post["text"],
-            "created_at": post["created_at"].isoformat() if isinstance(post["created_at"], datetime) else post["created_at"],
-            "updated_at": post["updated_at"].isoformat() if isinstance(post["updated_at"], datetime) else post["updated_at"],
+            "media": post.get("media"),
+            "created_at": self._to_timestamp(post["created_at"]),
+            "updated_at": self._to_timestamp(post["updated_at"]),
         }
+
+    @staticmethod
+    def _to_timestamp(value: Any) -> float:
+        """Convert a stored datetime to a Unix timestamp (PyMongo returns naive UTC)."""
+        if isinstance(value, datetime):
+            return (value.replace(tzinfo=UTC) if value.tzinfo is None else value).timestamp()
+        return float(value)

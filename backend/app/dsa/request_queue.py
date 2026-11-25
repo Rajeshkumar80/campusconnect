@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import uuid4
 
 
-class RequestStatus(str, Enum):
+class RequestStatus(StrEnum):
     """Connection request status."""
     PENDING = "pending"
     ACCEPTED = "accepted"
@@ -56,14 +56,17 @@ class RequestQueue:
         # Indexes for efficient queries
         self._by_sender: dict[str, set[str]] = {}      # sender_id -> set of request_ids
         self._by_recipient: dict[str, set[str]] = {}   # recipient_id -> set of request_ids
-        self._by_pair_status: dict[tuple[str, str, RequestStatus], str] = {}  # (sender, recipient, status) -> request_id
+        self._by_pair_status: dict[tuple[str, str, RequestStatus], str] = {}
+        # key: (sender, recipient, status) -> request_id
     
     def _add_indexes(self, request: ConnectionRequest) -> None:
         """Add request to all indexes."""
         self._by_sender.setdefault(request.sender_id, set()).add(request.request_id)
         self._by_recipient.setdefault(request.recipient_id, set()).add(request.request_id)
-        self._by_pair_status[(request.sender_id, request.recipient_id, request.status)] = request.request_id
-    
+        self._by_pair_status[(request.sender_id, request.recipient_id, request.status)] = (
+            request.request_id
+        )
+
     def _remove_indexes(self, request: ConnectionRequest) -> None:
         """Remove request from all indexes."""
         self._by_sender.get(request.sender_id, set()).discard(request.request_id)
@@ -79,12 +82,23 @@ class RequestQueue:
     def _update_status_index(self, request: ConnectionRequest, old_status: RequestStatus) -> None:
         """Update status index after status change."""
         self._by_pair_status.pop((request.sender_id, request.recipient_id, old_status), None)
-        self._by_pair_status[(request.sender_id, request.recipient_id, request.status)] = request.request_id
-    
-    def create_request(self, sender_id: str, recipient_id: str) -> ConnectionRequest:
+        self._by_pair_status[(request.sender_id, request.recipient_id, request.status)] = (
+            request.request_id
+        )
+
+    def create_request(
+        self,
+        sender_id: str,
+        recipient_id: str,
+        request_id: str | None = None,
+    ) -> ConnectionRequest:
         """
         Create a new pending connection request.
-        
+
+        Args:
+            request_id: Optional ID to use instead of a generated one. Callers that
+                persist the request must pass the persisted ID so both layers agree.
+
         Raises:
             ValueError: If self-request, duplicate pending, or reverse pending exists.
         """
@@ -96,13 +110,15 @@ class RequestQueue:
         if existing:
             raise ValueError("Pending request already exists")
         
-        existing_reverse = self._by_pair_status.get((recipient_id, sender_id, RequestStatus.PENDING))
+        existing_reverse = self._by_pair_status.get(
+            (recipient_id, sender_id, RequestStatus.PENDING)
+        )
         if existing_reverse:
             raise ValueError("Recipient already has a pending request to you")
         
         now = datetime.now(UTC)
         request = ConnectionRequest(
-            request_id=str(uuid4()),
+            request_id=request_id or str(uuid4()),
             sender_id=sender_id,
             recipient_id=recipient_id,
             status=RequestStatus.PENDING,

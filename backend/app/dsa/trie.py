@@ -189,7 +189,9 @@ class PrefixIndex:
         left = bisect.bisect_left(self._entries, (norm_prefix, ""))
         
         results = []
-        for i in range(left, min(len(self._entries), left + limit * 3)):  # Scan a bit extra for dedup
+        # Scan a bit extra for dedup
+        scan_end = min(len(self._entries), left + limit * 3)
+        for i in range(left, scan_end):
             key, user_id = self._entries[i]
             if not key.startswith(norm_prefix):
                 break

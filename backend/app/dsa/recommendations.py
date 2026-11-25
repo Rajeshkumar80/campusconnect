@@ -8,7 +8,7 @@ Algorithm:
 1. Candidate set = neighbours of neighbours (2-hop reachable users)
 2. Exclude: self, existing connections, users with pending requests (if tracked)
 3. Score each candidate by |N(u) ∩ N(v)| (common neighbour count)
-4. Optional: Jaccard score = |N(u) ∩ N(v)| / |N(u) ∪ N(v)|
+4. Optional: Jaccard score = |N(u) INTERSECT N(v)| / |N(u) UNION N(v)|
 5. Rank by descending score, then stable tie-break by user ID.
 
 Time complexity: O(deg(u) * avg_deg) for candidate generation + scoring.
@@ -71,7 +71,7 @@ def _score_jaccard(graph: Graph, user_id: str, candidate_id: str) -> float:
     """
     Score a candidate by Jaccard similarity.
     
-    J(u,v) = |N(u) ∩ N(v)| / |N(u) ∪ N(v)|
+    J(u,v) = |N(u) INTERSECT N(v)| / |N(u) UNION N(v)|
     Returns 0.0 if union is empty.
     """
     neighbors_u = graph.neighbors(user_id)

@@ -191,7 +191,7 @@ class TestRecommendations:
         
         # Both charlie and eve have 1 mutual, but different union sizes
         # charlie neighbors: {bob, eve} -> union with alice {bob, diana} = {bob, diana, eve} = 3
-        # eve neighbors: {diana, charlie} -> union with alice {bob, diana} = {bob, diana, charlie} = 3
+        # eve neighbors: {diana, charlie} -> union with alice {bob, diana} = {bob, diana, charlie}
         # Both Jaccard = 1/3, tie-break by user_id
         assert len(suggestions) == 2
         assert suggestions[0].user_id == "charlie"

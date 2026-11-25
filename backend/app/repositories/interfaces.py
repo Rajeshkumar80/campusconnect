@@ -144,6 +144,7 @@ class PostRepository(ABC):
         self,
         author_id: str,
         text: str,
+        media: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a new post."""
         ...

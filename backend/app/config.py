@@ -5,7 +5,15 @@ Flask Application Configuration.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Final
+
+from dotenv import load_dotenv
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+# Load the local .env before the config classes read the environment.
+load_dotenv()
 
 
 class Config:
@@ -22,6 +30,10 @@ class Config:
     
     # Frontend
     FRONTEND_ORIGIN: str = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+    # Comma-separated allowlist. Requests from other origins are rejected.
+    CORS_ALLOWED_ORIGINS: str = os.environ.get(
+        "CORS_ALLOWED_ORIGINS", os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+    )
     
     # Session
     SESSION_COOKIE_SECURE: bool = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
@@ -32,6 +44,11 @@ class Config:
     # Rate limiting
     RATELIMIT_DEFAULT: str = "100 per minute"
     RATELIMIT_STORAGE_URL: str = "memory://"
+    RATELIMIT_ENABLED: bool = os.environ.get("RATELIMIT_ENABLED", "true").lower() == "true"
+
+    # Media uploads (post images/videos). Files live outside the source tree.
+    UPLOAD_FOLDER: str = os.environ.get("UPLOAD_FOLDER", str(BACKEND_DIR / "uploads"))
+    MAX_CONTENT_LENGTH: int = 60 * 1024 * 1024
     
     # Security
     BCRYPT_ROUNDS: int = 12

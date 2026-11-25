@@ -1,11 +1,14 @@
-"""
+﻿"""
 Authentication Routes - Register, Login, Logout, Current User.
 """
 
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
+from flask_wtf.csrf import generate_csrf
 
+from app.api.errors import error_response, internal_error
+from app.extensions import csrf, limiter
 from app.security.decorators import (
     clear_current_user,
     get_current_user_id,
@@ -16,7 +19,19 @@ from app.services.auth_service import AuthService
 auth_bp = Blueprint("auth", __name__)
 
 
+@auth_bp.get("/csrf")
+@csrf.exempt
+def csrf_token() -> tuple[dict, int]:
+    """Issue a CSRF token for the SPA (also returned in the X-CSRFToken header)."""
+    token = generate_csrf()
+    response = jsonify({"data": {"csrf_token": token}})
+    response.headers["X-CSRFToken"] = token
+    return response, 200
+
+
 @auth_bp.post("/register")
+@csrf.exempt
+@limiter.limit("20 per minute")
 def register() -> tuple[dict, int]:
     """Register a new user."""
     data = request.get_json() or {}
@@ -31,13 +46,13 @@ def register() -> tuple[dict, int]:
     
     # Validation
     if not username:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "Username is required"}}), 400
+        return error_response("VALIDATION_ERROR", "Username is required", 400)
     if not password:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "Password is required"}}), 400
+        return error_response("VALIDATION_ERROR", "Password is required", 400)
     if len(password) < 8:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "Password must be at least 8 characters"}}), 400
+        return error_response("VALIDATION_ERROR", "Password must be at least 8 characters", 400)
     if not name:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "Name is required"}}), 400
+        return error_response("VALIDATION_ERROR", "Name is required", 400)
     
     try:
         auth_service = AuthService()
@@ -61,12 +76,14 @@ def register() -> tuple[dict, int]:
             }
         }), 201
     except ValueError as e:
-        return jsonify({"error": {"code": "CONFLICT", "message": str(e)}}), 409
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+        return error_response("CONFLICT", str(e), 409)
+    except Exception:
+        return internal_error()
 
 
 @auth_bp.post("/login")
+@csrf.exempt
+@limiter.limit("30 per minute")
 def login() -> tuple[dict, int]:
     """Log in a user."""
     data = request.get_json() or {}
@@ -75,7 +92,7 @@ def login() -> tuple[dict, int]:
     password = data.get("password", "")
     
     if not username or not password:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "Username and password required"}}), 400
+        return error_response("VALIDATION_ERROR", "Username and password required", 400)
     
     try:
         auth_service = AuthService()
@@ -91,9 +108,9 @@ def login() -> tuple[dict, int]:
         }), 200
     except ValueError:
         # Generic error to prevent account enumeration
-        return jsonify({"error": {"code": "UNAUTHORIZED", "message": "Invalid username or password"}}), 401
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+        return error_response("UNAUTHORIZED", "Invalid username or password", 401)
+    except Exception:
+        return internal_error()
 
 
 @auth_bp.post("/logout")
@@ -108,15 +125,15 @@ def current_user() -> tuple[dict, int]:
     """Get current authenticated user."""
     user_id = get_current_user_id()
     if not user_id:
-        return jsonify({"error": {"code": "UNAUTHORIZED", "message": "Not authenticated"}}), 401
+        return error_response("UNAUTHORIZED", "Not authenticated", 401)
     
     try:
         auth_service = AuthService()
         user = auth_service.get_current_user(user_id)
         if not user:
             clear_current_user()
-            return jsonify({"error": {"code": "UNAUTHORIZED", "message": "User not found"}}), 401
+            return error_response("UNAUTHORIZED", "User not found", 401)
         
         return jsonify({"data": {"user": user}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()

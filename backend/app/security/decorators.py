@@ -10,37 +10,55 @@ from functools import wraps
 from flask import g, jsonify, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
+# Argon2id parameters - hash and verify must use the same settings.
+ARGON2_TIME_COST = 3
+ARGON2_MEMORY_COST = 65536
+ARGON2_PARALLELISM = 4
+
+
+def _argon2_hasher():
+    """Return an Argon2id hasher, or None if argon2-cffi is unavailable."""
+    try:
+        from argon2 import PasswordHasher
+    except ImportError:
+        return None
+
+    return PasswordHasher(
+        time_cost=ARGON2_TIME_COST,
+        memory_cost=ARGON2_MEMORY_COST,
+        parallelism=ARGON2_PARALLELISM,
+        hash_len=32,
+        salt_len=16,
+    )
+
 
 # Argon2id password hashing
 def hash_password(password: str) -> str:
-    """Hash password using Argon2id via werkzeug (PBKDF2 fallback)."""
-    # Using werkzeug's generate_password_hash with pbkdf2:sha256 as fallback
-    # For true Argon2id, use argon2-cffi directly
-    try:
-        from argon2 import PasswordHasher
-        ph = PasswordHasher(
-            time_cost=3,
-            memory_cost=65536,
-            parallelism=4,
-            hash_len=32,
-            salt_len=16,
-        )
-        return ph.hash(password)
-    except ImportError:
-        # Fallback to werkzeug
-        return generate_password_hash(password, method="pbkdf2:sha256:600000", salt_length=16)
+    """Hash a password using Argon2id (PBKDF2 fallback if argon2-cffi is missing)."""
+    hasher = _argon2_hasher()
+    if hasher is not None:
+        return hasher.hash(password)
+    return generate_password_hash(password, method="pbkdf2:sha256:600000", salt_length=16)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    """Verify password against hash."""
+    """Verify a password against a stored hash. Never raises."""
+    if not password or not password_hash:
+        return False
+
+    if password_hash.startswith("$argon2"):
+        hasher = _argon2_hasher()
+        if hasher is None:
+            return False
+        try:
+            return bool(hasher.verify(password_hash, password))
+        except Exception:
+            return False
+
     try:
-        from argon2 import PasswordHasher
-        ph = PasswordHasher()
-        ph.verify(password_hash, password)
-        return True
+        return bool(check_password_hash(password_hash, password))
     except Exception:
-        # Fallback to werkzeug
-        return check_password_hash(password_hash, password)
+        return False
 
 
 def login_required(f: Callable) -> Callable:
@@ -48,7 +66,10 @@ def login_required(f: Callable) -> Callable:
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "user_id" not in session:
-            return jsonify({"error": {"code": "UNAUTHORIZED", "message": "Authentication required"}}), 401
+            return (
+                jsonify({"error": {"code": "UNAUTHORIZED", "message": "Authentication required"}}),
+                401,
+            )
         g.current_user_id = session["user_id"]
         return f(*args, **kwargs)
     return decorated_function

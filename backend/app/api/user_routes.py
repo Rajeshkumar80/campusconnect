@@ -1,4 +1,4 @@
-"""
+﻿"""
 User Routes - Search and User Details.
 """
 
@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
+from app.api.errors import error_response, internal_error
 from app.security.decorators import login_required
 from app.services.user_service import UserService
 
@@ -27,8 +28,8 @@ def search_users() -> tuple[dict, int]:
         users = user_service.search_users(query, limit)
         
         return jsonify({"data": {"users": users}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()
 
 
 @user_bp.get("/<user_id>")
@@ -40,8 +41,8 @@ def get_user(user_id: str) -> tuple[dict, int]:
         user = user_service.get_user(user_id)
         
         if not user:
-            return jsonify({"error": {"code": "NOT_FOUND", "message": "User not found"}}), 404
+            return error_response("NOT_FOUND", "User not found", 404)
         
         return jsonify({"data": {"user": user}}), 200
-    except Exception as e:
-        return jsonify({"error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+    except Exception:
+        return internal_error()

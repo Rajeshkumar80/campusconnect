@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from app.repositories.formatting import iso_or_raw
 from app.repositories.interfaces import UserRepository
 
 
@@ -91,7 +92,7 @@ class MongoUserRepository(UserRepository):
         return result.modified_count > 0
     
     def create_profile(self, user_id: str, profile_data: dict[str, Any]) -> dict[str, Any]:
-        """Create user profile."""
+        """Create or replace a user profile."""
         now = datetime.now(UTC)
         profile_doc = {
             "_id": user_id,
@@ -102,7 +103,8 @@ class MongoUserRepository(UserRepository):
             "skills": profile_data.get("skills", []),
             "updated_at": now,
         }
-        self._profiles.insert_one(profile_doc)
+        # create_user already inserted a placeholder profile, so replace it.
+        self._profiles.replace_one({"_id": user_id}, profile_doc, upsert=True)
         return self._format_profile(profile_doc)
     
     def get_profile(self, user_id: str) -> dict[str, Any] | None:
@@ -131,7 +133,8 @@ class MongoUserRepository(UserRepository):
         return {
             "user_id": user["_id"],
             "username": user["username"],
-            "created_at": user["created_at"].isoformat() if isinstance(user["created_at"], datetime) else user["created_at"],
+            "password_hash": user["password_hash"],
+            "created_at": iso_or_raw(user["created_at"]),
             "status": user["status"],
             "profile": self._format_profile(profile) if profile else None,
         }
@@ -145,5 +148,5 @@ class MongoUserRepository(UserRepository):
             "year": profile.get("year", 0),
             "bio": profile.get("bio", ""),
             "skills": profile.get("skills", []),
-            "updated_at": profile["updated_at"].isoformat() if isinstance(profile["updated_at"], datetime) else profile["updated_at"],
+            "updated_at": iso_or_raw(profile["updated_at"]),
         }

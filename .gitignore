@@ -35,6 +35,9 @@ Thumbs.db
 *.db
 *.sqlite
 
+# Uploaded media
+backend/uploads/
+
 # Build artifacts
 *.egg-info/
 dist/

@@ -128,7 +128,12 @@ def degree_of_connection(graph: Graph, source: str, target: str) -> int | None:
     return None  # not connected
 
 
-def degree_of_connection_bounded(graph: Graph, source: str, target: str, max_depth: int = 3) -> int | None:
+def degree_of_connection_bounded(
+    graph: Graph,
+    source: str,
+    target: str,
+    max_depth: int = 3,
+) -> int | None:
     """
     Get degree of connection with early termination at max_depth.
     
