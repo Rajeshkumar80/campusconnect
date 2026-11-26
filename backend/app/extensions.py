@@ -53,7 +53,10 @@ def init_extensions(app: Flask) -> None:
     
     # MongoDB
     global mongo_client, mongo_db
-    mongo_client = MongoClient(config.MONGODB_URI)
+    mongo_client = MongoClient(
+        config.MONGODB_URI,
+        serverSelectionTimeoutMS=10000,
+    )
     mongo_db = mongo_client[config.MONGODB_DATABASE]
 
     # Create indexes
